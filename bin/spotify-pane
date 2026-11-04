@@ -17,7 +17,9 @@ running() { curl -fsS -m 1 "${URL}healthz" >/dev/null 2>&1; }
 
 start() {
   running && return 0
-  command -v node >/dev/null || { echo "spotify-pane: node is not on PATH" >&2; exit 1; }
+  command -v node >/dev/null || { echo "spotify-pane: node is not on PATH (needs Node 18+)" >&2; exit 1; }
+  local major; major="$(node -p 'process.versions.node.split(".")[0]')"
+  (( major >= 18 )) || { echo "spotify-pane: needs Node 18+, found $(node --version)" >&2; exit 1; }
   nohup node "$HERE/server.mjs" >>"$LOG" 2>&1 &
   echo $! >"$PIDFILE"
   for _ in $(seq 1 50); do running && return 0; sleep 0.1; done
