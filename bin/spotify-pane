@@ -15,13 +15,27 @@ mkdir -p "$STATE_DIR"
 
 running() { curl -fsS -m 1 "${URL}healthz" >/dev/null 2>&1; }
 
+LABEL="dev.spotify-pane.$PORT"
+
 start() {
   running && return 0
   command -v node >/dev/null || { echo "spotify-pane: node is not on PATH (needs Node 18+)" >&2; exit 1; }
   local major; major="$(node -p 'process.versions.node.split(".")[0]')"
   (( major >= 18 )) || { echo "spotify-pane: needs Node 18+, found $(node --version)" >&2; exit 1; }
-  nohup node "$HERE/server.mjs" >>"$LOG" 2>&1 &
-  echo $! >"$PIDFILE"
+  if [[ "$(uname)" == Darwin ]]; then
+    # Run under launchd, not as a child of this shell. macOS holds the app a process
+    # was started from responsible for its Apple Events; a terminal without the
+    # automation entitlement (zterm today) leaves the Spotify permission prompt hanging.
+    launchctl remove "$LABEL" 2>/dev/null || true
+    local envs=(SPOTIFY_PANE_PORT="$PORT" SPOTIFY_PANE_HOME="$STATE_DIR")
+    for v in SPOTIFY_PANE_BACKEND SPOTIFY_PANE_MOCK SPOTIFY_PANE_MOCK_NEED SPOTIFY_CLIENT_ID; do
+      [[ -n "${!v:-}" ]] && envs+=("$v=${!v}")
+    done
+    launchctl submit -l "$LABEL" -o "$LOG" -e "$LOG" -- /usr/bin/env "${envs[@]}" "$(command -v node)" "$HERE/server.mjs"
+  else
+    nohup node "$HERE/server.mjs" >>"$LOG" 2>&1 &
+    echo $! >"$PIDFILE"
+  fi
   for _ in $(seq 1 50); do running && return 0; sleep 0.1; done
   echo "spotify-pane: the server did not come up; see $LOG" >&2
   tail -n 5 "$LOG" >&2
@@ -29,8 +43,11 @@ start() {
 }
 
 stop() {
-  if [[ -f "$PIDFILE" ]] && kill "$(cat "$PIDFILE")" 2>/dev/null; then echo "stopped"; else echo "not running"; fi
+  local stopped=
+  if [[ "$(uname)" == Darwin ]] && launchctl remove "$LABEL" 2>/dev/null; then stopped=1; fi
+  if [[ -f "$PIDFILE" ]] && kill "$(cat "$PIDFILE")" 2>/dev/null; then stopped=1; fi
   rm -f "$PIDFILE"
+  [[ -n "$stopped" ]] && echo "stopped" || echo "not running"
 }
 
 case "${1:-split_right}" in

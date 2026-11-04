@@ -1,7 +1,7 @@
 'use strict';
 
 const $ = (id) => document.getElementById(id);
-const screens = ['setup', 'signin', 'idle', 'player'];
+const screens = ['setup', 'signin', 'launch', 'permission', 'idle', 'player'];
 const show = (name) => screens.forEach((s) => { $(s).hidden = s !== name; });
 
 // ---------- server calls ----------
@@ -31,7 +31,8 @@ let seeking = false;
 let volumeTouchedAt = 0;   // ignore server volume briefly after the user moves it
 let lastArt = null;
 let pollTimer;
-let forceSetup = false;  // the person asked to change the client ID
+let forceSetup = false;
+let caps = {};            // what the backend can do  // the person asked to change the client ID
 
 const fmt = (ms) => {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -104,19 +105,37 @@ async function renderDevices() {
 
 // ---------- polling ----------
 
+const PERMISSION_TEXT = {
+  'permission-pending': 'macOS is asking whether your terminal may control Spotify. Look for the dialog and click OK.',
+  'permission-denied': 'Your terminal is not allowed to control Spotify. Turn it on in System Settings → Privacy & Security → Automation, then come back.',
+  'not-installed': 'The Spotify app is not installed on this Mac. Install it from spotify.com/download.',
+};
+
 async function poll() {
   clearTimeout(pollTimer);
   let next = document.hidden ? 10000 : 2000;
   try {
-    const status = await api('status');
-    $('redirect-uri').textContent = status.redirectUri;
-    if (!status.configured || forceSetup) { show('setup'); next = 5000; }
-    else if (!status.signedIn) { show('signin'); next = 1500; }  // fast, to notice the browser sign-in finishing
-    else {
-      const s = await api('state');
+    const s = await api('state');
+    caps = s.caps || {};
+    if (s.need) {
+      state = null; document.title = 'Spotify';
+      if (s.redirectUri) $('redirect-uri').textContent = s.redirectUri;
+      if (s.need === 'setup' || (forceSetup && s.backend === 'webapi')) { show('setup'); next = 5000; }
+      else if (s.need === 'signin') { show('signin'); next = 1500; }  // fast, to notice the browser sign-in finishing
+      else if (s.need === 'launch') { show('launch'); next = 3000; }
+      else { $('permission-text').textContent = PERMISSION_TEXT[s.need] || s.need; show('permission'); next = 3000; }
+    } else if (forceSetup) {
+      show('setup'); next = 5000;
+    } else {
       state = s; stateAt = Date.now();
       if (s.item) { show('player'); render(); }
-      else { document.title = 'Spotify'; if ($('idle').hidden) renderDevices(); show('idle'); next = 5000; }
+      else {
+        document.title = 'Spotify';
+        $('devices-wrap').hidden = !caps.devices;
+        $('idle-play').hidden = !!caps.devices;
+        if (caps.devices && $('idle').hidden) renderDevices();
+        show('idle'); next = caps.devices ? 5000 : 2000;
+      }
     }
   } catch (e) {
     if (e.status === 429) next = 15000;
@@ -133,8 +152,9 @@ async function control(route, body = {}, optimistic) {
   if (optimistic && state) { optimistic(state); render(); }
   try { await api(route, body); }
   catch (e) {
-    toast(e.status === 404 ? 'No active device. Start Spotify somewhere first.'
-        : e.status === 403 ? `Spotify refused: ${e.message}` : e.message);
+    toast(PERMISSION_TEXT[e.message]
+        || (e.status === 404 ? 'No active device. Start Spotify somewhere first.'
+        : e.status === 403 ? `Spotify refused: ${e.message}` : e.message));
   }
   setTimeout(poll, 400);
 }
@@ -146,7 +166,8 @@ const togglePlay = () => {
 };
 const skip = (dir) => control(dir, {});
 const cycleRepeat = () => {
-  const nextMode = { off: 'context', context: 'track', track: 'off' }[state?.repeat || 'off'];
+  const order = caps.repeatTrack ? { off: 'context', context: 'track', track: 'off' } : { off: 'context', context: 'off', track: 'off' };
+  const nextMode = order[state?.repeat || 'off'];
   control('repeat', { state: nextMode }, (s) => { s.repeat = nextMode; });
 };
 const toggleShuffle = () => {
@@ -206,5 +227,7 @@ $('signin-btn').onclick = async () => {
 };
 $('change-client').onclick = (e) => { e.preventDefault(); forceSetup = true; poll(); };
 $('refresh-devices').onclick = renderDevices;
+$('launch-btn').onclick = () => control('launch');
+$('idle-play').onclick = () => control('play');
 
 poll();

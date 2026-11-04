@@ -32,12 +32,28 @@
   <p class="muted"><a href="#" id="change-client">Use a different client ID</a></p>
 </section>
 
-<!-- signed in, nothing playing anywhere -->
+<!-- local: the Spotify app is closed -->
+<section id="launch" class="screen card" hidden>
+  <h1>Spotify isn't running</h1>
+  <p class="muted">This pane controls the Spotify app on this computer.</p>
+  <button id="launch-btn">Open Spotify</button>
+</section>
+
+<!-- local: macOS automation permission -->
+<section id="permission" class="screen card" hidden>
+  <h1>Permission needed</h1>
+  <p id="permission-text"></p>
+</section>
+
+<!-- nothing playing -->
 <section id="idle" class="screen card" hidden>
   <h1>Nothing playing</h1>
-  <p class="muted">Pick a device to start playback on, or press play in any Spotify app.</p>
-  <ul id="devices"></ul>
-  <button id="refresh-devices" class="ghost">Refresh devices</button>
+  <button id="idle-play">▶ Play</button>
+  <div id="devices-wrap">
+    <p class="muted">Pick a device to start playback on, or press play in any Spotify app.</p>
+    <ul id="devices"></ul>
+    <button id="refresh-devices" class="ghost">Refresh devices</button>
+  </div>
 </section>
 
 <!-- now playing -->
