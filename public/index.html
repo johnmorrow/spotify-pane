@@ -1,0 +1,72 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spotify</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="backdrop"></div>
+
+<!-- first run: paste a client ID -->
+<section id="setup" class="screen card" hidden>
+  <h1>Set up Spotify</h1>
+  <ol>
+    <li>Open <a href="https://developer.spotify.com/dashboard" target="_blank">developer.spotify.com/dashboard</a> and create an app.</li>
+    <li>Add this redirect URI: <code id="redirect-uri"></code></li>
+    <li>Tick <b>Web API</b>, save, then paste the app's Client ID here.</li>
+  </ol>
+  <form id="setup-form">
+    <input id="client-id" placeholder="Client ID" autocomplete="off" spellcheck="false">
+    <button type="submit">Save</button>
+  </form>
+  <p id="setup-error" class="error"></p>
+</section>
+
+<!-- configured but not signed in -->
+<section id="signin" class="screen card" hidden>
+  <h1>Connect Spotify</h1>
+  <p>Sign-in opens in your browser. Come back here when it says you're connected.</p>
+  <button id="signin-btn">Sign in with Spotify</button>
+  <p class="muted"><a href="#" id="change-client">Use a different client ID</a></p>
+</section>
+
+<!-- signed in, nothing playing anywhere -->
+<section id="idle" class="screen card" hidden>
+  <h1>Nothing playing</h1>
+  <p class="muted">Pick a device to start playback on, or press play in any Spotify app.</p>
+  <ul id="devices"></ul>
+  <button id="refresh-devices" class="ghost">Refresh devices</button>
+</section>
+
+<!-- now playing -->
+<main id="player" class="screen" hidden>
+  <a id="art-link" target="_blank"><img id="art" alt=""></a>
+  <div id="meta">
+    <div id="title"></div>
+    <div id="artist"></div>
+    <div id="album"></div>
+  </div>
+  <div id="progress">
+    <span id="elapsed">0:00</span>
+    <input id="seek" type="range" min="0" max="1000" value="0">
+    <span id="duration">0:00</span>
+  </div>
+  <div id="controls">
+    <button id="shuffle" class="icon toggle" title="Shuffle (s)">⤮</button>
+    <button id="prev" class="icon" title="Previous (←)">⏮</button>
+    <button id="playpause" class="icon big" title="Play/pause (space)">▶</button>
+    <button id="next" class="icon" title="Next (→)">⏭</button>
+    <button id="repeat" class="icon toggle" title="Repeat (r)">↻</button>
+  </div>
+  <div id="footer">
+    <span id="device" title="Playing on"></span>
+    <label id="volume-wrap" title="Volume (↑/↓)">🔈<input id="volume" type="range" min="0" max="100"></label>
+  </div>
+</main>
+
+<div id="toast" hidden></div>
+<script src="app.js"></script>
+</body>
+</html>

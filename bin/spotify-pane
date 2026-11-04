@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# spotify-pane — open a Spotify now-playing pane in zterm.
+#
+#   spotify-pane [split_right|split_down|new_tab|new_window] [--ratio 0.35]
+#   spotify-pane start | stop | status | logs
+set -euo pipefail
+
+HERE="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+PORT="${SPOTIFY_PANE_PORT:-8888}"
+URL="http://127.0.0.1:${PORT}/"
+STATE_DIR="${SPOTIFY_PANE_HOME:-$HOME/.config/spotify-pane}"
+LOG="$STATE_DIR/server.log"
+PIDFILE="$STATE_DIR/server.pid"
+mkdir -p "$STATE_DIR"
+
+running() { curl -fsS -m 1 "${URL}healthz" >/dev/null 2>&1; }
+
+start() {
+  running && return 0
+  command -v node >/dev/null || { echo "spotify-pane: node is not on PATH" >&2; exit 1; }
+  nohup node "$HERE/server.mjs" >>"$LOG" 2>&1 &
+  echo $! >"$PIDFILE"
+  for _ in $(seq 1 50); do running && return 0; sleep 0.1; done
+  echo "spotify-pane: the server did not come up; see $LOG" >&2
+  tail -n 5 "$LOG" >&2
+  exit 1
+}
+
+stop() {
+  if [[ -f "$PIDFILE" ]] && kill "$(cat "$PIDFILE")" 2>/dev/null; then echo "stopped"; else echo "not running"; fi
+  rm -f "$PIDFILE"
+}
+
+case "${1:-split_right}" in
+  start)  start; echo "serving $URL" ;;
+  stop)   stop ;;
+  status) running && echo "running on $URL" || { echo "not running"; exit 1; } ;;
+  logs)   exec tail -f "$LOG" ;;
+  split_right|split_down|new_tab|new_window)
+    action="$1"; shift || true
+    start
+    args=(perform "$action" --url "$URL")
+    if [[ "$action" == split_* ]]; then
+      [[ "$*" == *--ratio* ]] || args+=(--ratio 0.35)
+      [[ -n "${ZESTFUL_TERM_PANE_ID:-}" ]] && args+=(--target "$ZESTFUL_TERM_PANE_ID")
+    fi
+    exec zterm "${args[@]}" "$@"
+    ;;
+  -h|--help|help) sed -n '2,6p' "$0" | sed 's/^# \{0,1\}//' ;;
+  *) echo "spotify-pane: unknown command '$1' (try --help)" >&2; exit 2 ;;
+esac
