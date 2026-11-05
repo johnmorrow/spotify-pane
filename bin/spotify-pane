@@ -59,7 +59,7 @@ case "${1:-split_right}" in
   status) running && echo "running on $URL" || { echo "not running"; exit 1; } ;;
   logs)   exec tail -f "$LOG" ;;
   split_right|split_down|new_tab|new_window)
-    action="$1"; shift || true
+    action="${1:-split_right}"; shift || true
     start
     args=(perform "$action" --url "$URL")
     if [[ "$action" == split_* ]]; then
