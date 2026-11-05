@@ -4,7 +4,7 @@
 
 import { execFile } from 'node:child_process';
 import os from 'node:os';
-import { ApiError } from './common.mjs';
+import { ApiError, checkUri } from './common.mjs';
 
 const TIMEOUT_MS = 6000;
 
@@ -15,6 +15,7 @@ function run(argv) {
   const [cmd, arg] = argv;
   const s = Application('Spotify');
   if (cmd === 'launch') { s.activate(); return 'ok'; }
+  if (cmd === 'playuri') { s.playTrack(arg); return 'ok'; }  // launches Spotify if needed
   if (!s.running()) return JSON.stringify({ running: false });
   switch (cmd) {
     case 'state': {
@@ -114,6 +115,7 @@ export function createMacosBackend() {
       shuffle:  ({ state }) => jxa('shuffle', state ? 'true' : 'false'),
       repeat:   ({ state }) => jxa('repeat', state && state !== 'off' ? 'true' : 'false'),
       launch:   () => jxa('launch'),
+      playUri:  ({ uri }) => jxa('playuri', checkUri(uri)),
     },
   };
 }

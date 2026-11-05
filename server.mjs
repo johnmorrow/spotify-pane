@@ -32,6 +32,12 @@ async function loadBackend(name) {
 }
 const backend = await loadBackend(BACKEND);
 
+// Search, the queue and sign-in always go through the Web API, whatever plays the music:
+// AppleScript can play a URI but can't search or queue.
+const webapi = backend.search ? backend
+  : (await import('./backends/webapi.mjs')).createWebApiBackend({ origin: ORIGIN, configDir: CONFIG_DIR });
+const ACCOUNT_CONTROLS = ['config', 'logout', 'queue'];
+
 // ---------- HTTP ----------
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml', '.png': 'image/png' };
@@ -60,7 +66,7 @@ const server = http.createServer(async (req, res) => {
     // Mutations need a custom header, which a cross-site page can't send without a preflight we never answer.
     if (req.method !== 'GET' && req.headers['x-spotify-pane'] !== '1') return send(res, 403, { error: 'forbidden' });
 
-    const extra = req.method === 'GET' && backend.routes?.[url.pathname];
+    const extra = req.method === 'GET' && (backend.routes?.[url.pathname] || webapi.routes?.[url.pathname]);
     if (extra) {
       const r = await extra(url);
       return r.html ? send(res, r.status || 200, r.html, { 'Content-Type': 'text/html; charset=utf-8' }) : send(res, r.status || 200, r.json);
@@ -70,6 +76,11 @@ const server = http.createServer(async (req, res) => {
       const route = url.pathname.slice(5);
       if (route === 'state' && req.method === 'GET') {
         return send(res, 200, { backend: backend.name, caps: backend.caps, ...(await backend.state()) });
+      }
+      if (route === 'auth' && req.method === 'GET') return send(res, 200, webapi.auth());
+      if (route === 'search' && req.method === 'POST') return send(res, 200, await webapi.search(await readBody(req)));
+      if (req.method === 'POST' && ACCOUNT_CONTROLS.includes(route) && !Object.hasOwn(backend.controls, route)) {
+        await webapi.controls[route](await readBody(req)); return send(res, 200, { ok: true });
       }
       if (route === 'devices' && req.method === 'GET') {
         if (!backend.devices) return send(res, 404, { error: 'this backend has no device list' });

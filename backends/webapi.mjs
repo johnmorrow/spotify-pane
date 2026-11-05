@@ -5,7 +5,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { ApiError, readJson, writeJson, page } from './common.mjs';
+import { ApiError, readJson, writeJson, page, checkUri } from './common.mjs';
 
 const SCOPES = 'user-read-playback-state user-modify-playback-state user-read-currently-playing';
 const API = 'https://api.spotify.com/v1';
@@ -113,6 +113,21 @@ export function createWebApiBackend({ origin, configDir }) {
 
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, Math.round(+v || 0)));
 
+  const SEARCH_TYPES = ['track', 'album', 'playlist', 'artist'];
+  async function search({ q, type = 'track', limit = 8 }) {
+    if (!q) throw new ApiError(400, 'empty search');
+    if (!SEARCH_TYPES.includes(type)) throw new ApiError(400, `type must be one of ${SEARCH_TYPES.join(', ')}`);
+    if (!tokens?.refresh_token) throw new ApiError(401, 'search needs a Spotify sign-in: run `spotify-pane login`');
+    const r = await spotify('GET', `/search?type=${type}&limit=${clamp(limit, 1, 20)}&q=${encodeURIComponent(q)}`);
+    return (r?.[`${type}s`]?.items || []).filter(Boolean).map((x) => ({
+      uri: x.uri, type, name: x.name,
+      by: (x.artists || []).map((a) => a.name).join(', ') || x.owner?.display_name || '',
+      album: x.album?.name,
+      year: (x.release_date || x.album?.release_date || '').slice(0, 4) || undefined,
+      tracks: x.total_tracks ?? x.tracks?.total,
+    }));
+  }
+
   return {
     name: 'webapi',
     caps: { devices: true, repeatTrack: true },
@@ -123,6 +138,9 @@ export function createWebApiBackend({ origin, configDir }) {
       try { return shapeState(await spotify('GET', '/me/player?additional_types=episode')); }
       catch (e) { if (e.status === 401) return { need: 'signin' }; throw e; }
     },
+
+    search,
+    auth: () => ({ configured: !!config.clientId, signedIn: !!tokens?.refresh_token, redirectUri: REDIRECT_URI }),
 
     async devices() {
       return (await spotify('GET', '/me/player/devices')).devices
@@ -138,6 +156,16 @@ export function createWebApiBackend({ origin, configDir }) {
       volume:   ({ volume }) => spotify('PUT', `/me/player/volume?volume_percent=${clamp(volume, 0, 100)}`),
       shuffle:  ({ state }) => spotify('PUT', `/me/player/shuffle?state=${state ? 'true' : 'false'}`),
       repeat:   ({ state }) => spotify('PUT', `/me/player/repeat?state=${['off', 'context', 'track'].includes(state) ? state : 'off'}`),
+      playUri:  ({ uri }) => {
+        checkUri(uri);
+        const single = /^spotify:(track|episode):/.test(uri);
+        return spotify('PUT', '/me/player/play', single ? { uris: [uri] } : { context_uri: uri });
+      },
+      queue:    ({ uri }) => {
+        checkUri(uri);
+        if (!/^spotify:(track|episode):/.test(uri)) throw new ApiError(400, 'only tracks and episodes can be queued');
+        return spotify('POST', `/me/player/queue?uri=${encodeURIComponent(uri)}`);
+      },
       transfer: ({ device_id }) => spotify('PUT', '/me/player', { device_ids: [String(device_id)], play: true }),
       config:   ({ clientId }) => {
         if (!/^[0-9a-f]{32}$/i.test(clientId || '')) throw new ApiError(400, 'That does not look like a Spotify client ID (32 hex characters).');

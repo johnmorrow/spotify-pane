@@ -21,6 +21,10 @@ export function createMockBackend() {
           artists: ['Example Artist', 'Guest'], album: 'Example Album', image: null, url: null },
       };
     },
+    async search({ q, type = 'track' }) {
+      return [1, 2, 3].map((n) => ({ uri: `spotify:${type}:${String(n).repeat(22)}`, type, name: `${q} (result ${n})`, by: 'Mock Artist', year: '2001' }));
+    },
+    auth: () => ({ configured: true, signedIn: true }),
     async devices() { return [{ id: 'd1', name: 'MacBook Pro', type: 'Computer', active: true }]; },
     controls: {
       play:     () => set(() => { m.playing = true; }),
@@ -33,6 +37,8 @@ export function createMockBackend() {
       repeat:   ({ state }) => { m.repeat = state; },
       transfer: () => set(() => { m.playing = true; }),
       launch:   () => {},
+      queue:    () => {},
+      playUri:  ({ uri }) => set(() => { m.pos = 0; m.playing = true; m.uri = uri; }),
     },
   };
 }

@@ -14,3 +14,11 @@ export function page(title, message) {
 <style>body{font:15px system-ui;background:#121212;color:#eee;display:grid;place-items:center;height:100vh;margin:0}</style>
 <p>${escapeHtml(message)}</p>`;
 }
+
+// A Spotify URI the players accept, e.g. spotify:album:4RflOKVvzEFCxDlHlT0ZFJ
+export const SPOTIFY_URI = /^spotify:(track|album|playlist|artist|episode|show):[A-Za-z0-9]{22}$/;
+
+export function checkUri(uri) {
+  if (!SPOTIFY_URI.test(uri || '')) throw new ApiError(400, `not a Spotify URI: ${uri}`);
+  return uri;
+}

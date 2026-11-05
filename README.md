@@ -37,6 +37,31 @@ spotify-pane new_tab
 spotify-pane status | stop | logs
 ```
 
+### From the command line (or an agent)
+
+```sh
+spotify-pane now                                  # ▶ MISHIMA/Opening — Philip Glass (Mishima) 2:20/2:46 on Citadel
+spotify-pane search "mishima by philip glass" --type album
+spotify-pane play spotify:album:4RflOKVvzEFCxDlHlT0ZFJ
+spotify-pane play "glassworks opening by philip glass"   # top track hit
+spotify-pane play 'https://open.spotify.com/album/…?si=…' # links work; quote them in zsh
+spotify-pane queue "metamorphosis one by philip glass"   # plays after the current track
+spotify-pane play                                 # resume
+```
+
+`--type` is `track` (default), `album`, `playlist` or `artist`, and `--json`
+prints machine-readable results. "*title* by *artist*" narrows a search to
+that artist, but other performers' recordings of the piece can still rank first.
+To get exactly what you want, `search` first, then `play` the URI.
+
+Search and the queue use the Spotify Web API even in local mode, because
+AppleScript can play a URI but can't search or queue. Run `spotify-pane login
+<client-id>` once (see [Web API mode](#web-api-mode-optional) for creating the
+app), and the queue also needs Premium. `now`, `play <uri>` and the pane work
+without signing in.
+
+### First run
+
 The first time, macOS asks whether the server (`node` or `osascript`) may control
 Spotify. Click **OK**. If Spotify isn't running, the pane offers to open it.
 

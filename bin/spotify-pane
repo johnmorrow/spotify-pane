@@ -3,6 +3,8 @@
 #
 #   spotify-pane [split_right|split_down|new_tab|new_window] [--ratio 0.35]
 #   spotify-pane start | stop | status | logs
+#   spotify-pane now | play [<query|uri|link>] [--type album] | queue <query> | search <query> [--type T] [--json]
+#   spotify-pane login [client-id]       (search and queue use the Spotify Web API)
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
@@ -52,6 +54,7 @@ stop() {
 
 case "${1:-split_right}" in
   start)  start; echo "serving $URL" ;;
+  now|play|queue|search|login) start; exec node "$HERE/cli.mjs" "$@" ;;
   stop)   stop ;;
   status) running && echo "running on $URL" || { echo "not running"; exit 1; } ;;
   logs)   exec tail -f "$LOG" ;;
@@ -65,6 +68,6 @@ case "${1:-split_right}" in
     fi
     exec zterm "${args[@]}" "$@"
     ;;
-  -h|--help|help) sed -n '2,5p' "$0" | sed 's/^# \{0,1\}//' ;;
+  -h|--help|help) sed -n '2,7p' "$0" | sed 's/^# \{0,1\}//' ;;
   *) echo "spotify-pane: unknown command '$1' (try --help)" >&2; exit 2 ;;
 esac
