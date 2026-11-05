@@ -125,6 +125,7 @@ export function createWebApiBackend({ origin, configDir }) {
       album: x.album?.name,
       year: (x.release_date || x.album?.release_date || '').slice(0, 4) || undefined,
       tracks: x.total_tracks ?? x.tracks?.total,
+      duration_ms: x.duration_ms,
     }));
   }
 

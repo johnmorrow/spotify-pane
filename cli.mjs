@@ -52,7 +52,8 @@ function toQuery(s) {
   return m ? `${m[1]} artist:${m[2]}` : s;
 }
 
-const describe = (r) => [r.name, r.by && `— ${r.by}`, r.album && r.type === 'track' && `(${r.album})`, r.year && `[${r.year}]`,
+const mmss = (ms) => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`;
+const describe = (r) => [r.duration_ms && `${mmss(r.duration_ms)} `, r.name, r.by && `— ${r.by}`, r.album && r.type === 'track' && `(${r.album})`, r.year && `[${r.year}]`,
   r.tracks != null && r.type !== 'track' && `${r.tracks} tracks`].filter(Boolean).join(' ');
 
 async function resolve(input, type) {
